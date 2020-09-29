@@ -1,0 +1,38 @@
+---
+title: "Community annalisys in Vegan"
+author: "Julian Avila-Jimenez"
+date: "28/9/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message = FALSE)
+library(vegan)
+#remotes::install_github("gavinsimpson/ggvegan")
+library(ggvegan)
+library(tidyverse)
+```
+
+
+## Community annalisys in the R package (*vegan*)[https://github.com/vegandevs/vegan] 
+```{r Data}
+#load mite data (use ?mite to get more information)
+data(mite) #community data on mites collected from 70 soil cores
+data(mite.env) #Environmental data collevctes from cores locations 
+data(mite.pcnm) #Principal components of neighbor matrices
+```
+
+### Unconstrained ordination example
+
+#### PCA
+A (PCA)[https://en.wikipedia.org/wiki/Principal_component_analysis] is a linear combination of the explanatory variables, is a method to reduce dimensionality.
+```{r PCA}
+pca<- rda(mite.env[,1:2]) #pca only on the numerical variables substrate density and water content
+summary(pca)
+autoplot(pca, arrows = T)
+```
+
+Inertia means the amount of variance that is explained by the environmental variables. In the *summary* The eigen values of each PC represents the amount of inertia of that particular PC. 
+
