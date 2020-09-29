@@ -8,31 +8,168 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message = FALSE, cache=T)
 library(vegan)
 #remotes::install_github("gavinsimpson/ggvegan")
 library(ggvegan)
 library(tidyverse)
+library(skimr)
 ```
 
 
-## Community annalisys in the R package (*vegan*)[https://github.com/vegandevs/vegan] 
+## Community annalisys in the R package [Vegan](https://github.com/vegandevs/vegan) 
+
+---
+
+<div style="text-align: justify"> 
+
+First we want to load some data, the Oribatid mite data. 70 soil cores collected by Daniel Borcard in 1989. See Borcard et al. (1992, 1994) for details. 
+
+References
+
+Borcard, D., P. Legendre and P. Drapeau. 1992. Partialling out the spatial component of ecological variation. Ecology 73: 1045-1055.
+
+Borcard, D. and P. Legendre. 1994. Environmental control and spatial structure in ecological communities: an example using Oribatid mites (Acari, Oribatei). Environmental and Ecological Statistics 1: 37-61.
+
+Borcard, D. and P. Legendre. 2002. All-scale spatial analysis of ecological data by means of principal coordinates of neighbour matrices. Ecological Modelling 153: 51-68.
+
+</div>
+
 ```{r Data}
 #load mite data (use ?mite to get more information)
 data(mite) #community data on mites collected from 70 soil cores
-data(mite.env) #Environmental data collevctes from cores locations 
-data(mite.pcnm) #Principal components of neighbor matrices
+data(mite.env) #Environmental data collects from cores locations 
+data(mite.pcnm) #Principal components of neighbor matrices (Spatial data)
+skim(mite)
+skim(mite.env)
+skim(mite.pcnm)
 ```
 
 ### Unconstrained ordination example
 
 #### PCA
-A (PCA)[https://en.wikipedia.org/wiki/Principal_component_analysis] is a linear combination of the explanatory variables, is a method to reduce dimensionality.
+
+<div style="text-align: justify"> 
+
+A [PCA](https://en.wikipedia.org/wiki/Principal_component_analysis) is a linear combination of the explanatory variables, is a method to reduce dimensionality.
+
+</div>
+
 ```{r PCA}
 pca<- rda(mite.env[,1:2]) #pca only on the numerical variables substrate density and water content
 summary(pca)
 autoplot(pca, arrows = T)
 ```
 
-Inertia means the amount of variance that is explained by the environmental variables. In the *summary* The eigen values of each PC represents the amount of inertia of that particular PC. 
+<div style="text-align: justify"> 
+
+Inertia means the amount of variance that is explained by the environmental variables. In the *summary* The Eigen values of each PC represents the amount of inertia of that particular PC. 
+
+The vectors in the plot are the amount of variability associated with each variable represented in the length of the vector. In this example the water content is the most important factor, the sites on the right of the 0 value are the most humid and the sites on the left side the most driest. 
+
+### Constrained ordination example
+
+In ecology is important to understand how is the relationship of the variables with the community, in this case we want to know how the substrate density and the water content is related to the community, so we can explore this especific relation.
+
+</div>
+
+#### Redundancy annalisys
+
+```{r RDA}
+rda<- rda(mite~SubsDens+WatrCont, data=mite.env)
+rda
+autoplot(rda, arrows = T)
+```
+
+<div style="text-align: justify"> 
+
+Here we have a different history, the inertia values are now separated in constrained and unconstrained. The inertia constrained is the variance associated to the environmental variables and the unconstrained inertia is the amount of variance not explained by the variables (the residuals). In this example of the community structure we have a 21% of variance explained by the variables and a 87% not explained.
+
+You can use more than one predictor matrix
+
+</div>
+
+```{r RDA2}
+rda2<- rda(mite~.+as.matrix(mite.pcnm[,1:3]), data=mite.env) #Here we take only the first tree columns of the matrix because they represents the majority of the variation
+rda2
+autoplot(rda2, arrows = T)
+```
+
+<div style="text-align: justify"> 
+
+Here, 35% of the variation is explained by the variables and 64% is unexplained. The first dimensions (RDA) captures the majority of the variation. The water content is important in the community structure, in the first RDA dimension the community is divided by high and low water content; in the second RDA dimension the community sows a a gradient in the shrub density.
+
+### Partition of the variance among groups of factors.
+
+In ecology is interesting to see how the variation of the community is affected by the spatial factors and the environment factors, to see this we can make a partition in the factors and make an analysis of each part.
+
+</div>
+
+```{r v.part}
+v.part<- varpart(mite, mite.env[,1:2], mite.pcnm[,1:3]) #this object have the response matrix, the environmental component (first two columns) and the spatial component (first tree columns).
+v.part
+plot(v.part)
+```
+
+<div style="text-align: justify"> 
+
+Here we have tw explanatory tables, X1 represents the environmental information and X2 the spatial information. The result of the individual fractions sows that the effect of the environment controlled by the space is about 18%, the effect of the space controlled by the environment is just of 1.2%, and we have an interaction of the two factors of 1.4%. The rest of the variation is not explained by the factors 79%.
+
+**Is possible to use more partitions of the data!**
+
+</div>
+
+```{r v.part2}
+v.part2<- varpart(mite, ~SubsDens+ WatrCont, ~Substrate+ Shrub+ Topo,
+                  mite.pcnm[,1:3], data=mite.env, transfo = "hel")# in this object we use the two continuous variables and the two categorical variables of the environment data and the spatial data to create tree explanatory tables. The Hellinger transformation is used because we have abundance data.
+
+v.part2
+plot(v.part2)
+```
+
+<div style="text-align: justify"> 
+
+Here we have in the individual fractions that 6.9% of the variance is explained by the substrate density and the water content, 7.7% is explained by the substrate, shrub density and the topography and 3.3% by the spatial information; 52.9% of the variance of the community is not explained by the factors. 
+
+</div>
+
+### Non-Metric Multidimensial Scaling (NMDS)
+
+Nonmetric Multidimensional Scaling (NMDS) tries to find a stable solution using several random starts and calculating a *Dissimilarity Index*. The Bray- Curtis distance is a measure of dissimilarity between communities, ranges from 0 to 1 where 0 indicates complete similarity and 1 indicates turnover (lost) of species or similarity, is useful to evaluate beta diversity.  
+
+```{r}
+nmds<- metaMDS(mite)
+nmds
+```
+
+The *metaNDMS* function makes a square root transformation and a wisconsing double standarization of the data automaticly, if your data is already transformed you can tweak the function. 
+
+In this case is no convergence after the 20 runs, we can tweak the *trymax* argument to increase this number.
+
+```{r}
+nmds<- metaMDS(mite, trymax = 30)
+nmds
+autoplot(nmds, geom= "text")
+```
+
+The plot shows in the x axis that communities at the right have significant more individuals in the taxa showed, and so the communities of the left.
+
+#### Alternative plot for associations to a categorical variable
+
+We are interested in to see how the Shrub density can explain the community structure
+```{r}
+col<-c ("red","blue","green")
+shape<-c(18,20,15)
+plot(nmds$points, col=col[mite.env$Shrub], pch= shape[mite.env$Shrub],
+     cex=1.2, main="Mite Shrub Groups", xlab="NMDS1", ylab="NMDS2")
+ordispider(nmds, groups=mite.env$Shrub, label=T)
+```
+
+Now let's see the topo variable
+
+```{r}
+plot(nmds$points, col=col[mite.env$Topo], pch= shape[mite.env$Topo],
+     cex=1.2, main="Mite Topo Groups", xlab="NMDS1", ylab="NMDS2")
+ordispider(nmds, groups=mite.env$Topo, label=T)
+```
 
